@@ -1,0 +1,328 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: scamshield
+    description: ScamShield scan records and reputation services
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /scamshield/dashboard:
+    get:
+      operationId: getScamShieldDashboard
+      tags: [scamshield]
+      summary: Get scan statistics and recent activity
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /scamshield/scans:
+    get:
+      operationId: getScamShieldScans
+      tags: [scamshield]
+      summary: List saved scan reports
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: verdict
+          in: query
+          schema:
+            type: string
+            enum: [clean, suspicious, malicious]
+        - name: kind
+          in: query
+          schema:
+            type: string
+            enum: [file, url]
+      responses:
+        "200":
+          description: Saved scan reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScanRecord"
+    post:
+      operationId: createScamShieldScan
+      tags: [scamshield]
+      summary: Save a browser-performed scan report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanInput"
+      responses:
+        "201":
+          description: Saved report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanRecord"
+  /scamshield/scans/{scanId}:
+    get:
+      operationId: getScamShieldScan
+      tags: [scamshield]
+      summary: Get one saved scan report
+      parameters:
+        - name: scanId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Scan report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanRecord"
+        "404":
+          description: Scan not found
+    delete:
+      operationId: deleteScamShieldScan
+      tags: [scamshield]
+      summary: Delete one saved scan report
+      parameters:
+        - name: scanId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteScanResult"
+  /scamshield/virustotal/status:
+    get:
+      operationId: getVirusTotalStatus
+      tags: [scamshield]
+      summary: Check whether the server-side VirusTotal connection is configured
+      responses:
+        "200":
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VirusTotalStatus"
+  /scamshield/virustotal/check/{sha256}:
+    post:
+      operationId: checkVirusTotalHash
+      tags: [scamshield]
+      summary: Check a SHA-256 hash without uploading file contents
+      parameters:
+        - name: sha256
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-fA-F0-9]{64}$"
+      responses:
+        "200":
+          description: Hash reputation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VirusTotalReputation"
+        "404":
+          description: Hash is not in VirusTotal
+        "503":
+          description: Server-side VirusTotal key is not configured
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    ScanRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [file, url]
+        fileName:
+          type: [string, "null"]
+        fileType:
+          type: [string, "null"]
+        target:
+          type: string
+        sizeBytes:
+          type: [integer, "null"]
+        sha256:
+          type: [string, "null"]
+        sha1:
+          type: [string, "null"]
+        verdict:
+          type: string
+          enum: [clean, suspicious, malicious]
+        indicators:
+          type: array
+          items:
+            type: string
+        detectionSource:
+          type: string
+        scannedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - kind
+        - fileName
+        - fileType
+        - target
+        - sizeBytes
+        - sha256
+        - sha1
+        - verdict
+        - indicators
+        - detectionSource
+        - scannedAt
+    ScanInput:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [file, url]
+        fileName:
+          type: [string, "null"]
+        fileType:
+          type: [string, "null"]
+        target:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        sizeBytes:
+          type: [integer, "null"]
+          minimum: 0
+        sha256:
+          type: [string, "null"]
+          maxLength: 64
+        sha1:
+          type: [string, "null"]
+          maxLength: 40
+        verdict:
+          type: string
+          enum: [clean, suspicious, malicious]
+        indicators:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+            maxLength: 300
+        detectionSource:
+          type: string
+          maxLength: 120
+      required:
+        - kind
+        - fileName
+        - target
+        - sizeBytes
+        - sha256
+        - sha1
+        - verdict
+        - indicators
+        - detectionSource
+    DashboardSummary:
+      type: object
+      properties:
+        totalScans:
+          type: integer
+        cleanCount:
+          type: integer
+        suspiciousCount:
+          type: integer
+        maliciousCount:
+          type: integer
+        scannedToday:
+          type: integer
+        recentScans:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScanRecord"
+      required:
+        - totalScans
+        - cleanCount
+        - suspiciousCount
+        - maliciousCount
+        - scannedToday
+        - recentScans
+    DeleteScanResult:
+      type: object
+      properties:
+        deleted:
+          type: boolean
+      required: [deleted]
+    VirusTotalStatus:
+      type: object
+      properties:
+        configured:
+          type: boolean
+      required: [configured]
+    VirusTotalReputation:
+      type: object
+      properties:
+        sha256:
+          type: string
+        found:
+          type: boolean
+        malicious:
+          type: integer
+        suspicious:
+          type: integer
+        harmless:
+          type: integer
+        undetected:
+          type: integer
+        lastAnalysisAt:
+          type: [string, "null"]
+          format: date-time
+        engines:
+          type: array
+          items:
+            type: string
+      required:
+        - sha256
+        - found
+        - malicious
+        - suspicious
+        - harmless
+        - undetected
+        - lastAnalysisAt
+        - engines
+

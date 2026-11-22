@@ -1,0 +1,13 @@
+{
+  "name": "scamshield-project",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --dir ScamShield --filter @workspace/scamshield run dev",
+    "dev:api": "pnpm --dir ScamShield --filter @workspace/api-server run start",
+    "build": "pnpm --dir ScamShield run build",
+    "typecheck": "pnpm --dir ScamShield run typecheck",
+    "test": "pnpm --dir ScamShield --filter @workspace/scamshield run test"
+  }
+}
+
